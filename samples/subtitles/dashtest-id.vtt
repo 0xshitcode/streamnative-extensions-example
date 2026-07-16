@@ -1,0 +1,18 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:04.000 line:80%
+Ini trek WebVTT dari sample-repo.
+
+2
+00:00:04.100 --> 00:00:08.000 line:80%
+Ditampilkan di atas stream MPEG-DASH.
+
+3
+00:00:08.100 --> 00:00:12.000 line:80%
+Diproxy lewat server HTTP lokal StreamNative.
+
+4
+00:00:12.100 --> 00:00:20.000 line:80%
+Membuktikan pipeline DASH + subtitle track
+berjalan end-to-end.

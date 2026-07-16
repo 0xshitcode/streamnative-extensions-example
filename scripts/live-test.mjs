@@ -210,10 +210,17 @@ async function runOne(id, source) {
         results.links = links.length;
         if (links.length === 0) throw new Error("loadLinks() returned 0 sources");
 
-        // Probe the first *playable* link (HLS or direct mp4). Ignore
-        // iframe-only sources like Odysee — the app can't decode them.
+        // Count subtitle tracks across all links (visible in the summary).
+        results.subs = links.reduce(
+          (n, l) => n + (Array.isArray(l.subtitles) ? l.subtitles.length : 0),
+          0
+        );
+
+        // Probe the first *playable* link (HLS, DASH, or direct mp4).
+        // Ignore iframe-only sources like Odysee — the app can't decode
+        // them, and content-type would be text/html.
         const candidates = links.filter(
-          (l) => l.isM3u8 || /\.mp4(\?|$)/.test(l.url)
+          (l) => l.isM3u8 || l.isDash || /\.mp4(\?|$)/.test(l.url)
         );
         const first = candidates[0] || links[0];
         results.probedUrl = first.url.slice(0, 120);
@@ -226,9 +233,11 @@ async function runOne(id, source) {
           const ok = probe.status >= 200 && probe.status < 400;
           const isMedia =
             ct.includes("mpegurl") ||
+            ct.includes("dash+xml") ||
             ct.includes("video/") ||
             ct.includes("octet-stream") ||
-            first.isM3u8;
+            first.isM3u8 ||
+            first.isDash;
           if (ok && isMedia) {
             results.playable = true;
             results.probeStatus = probe.status;
@@ -252,6 +261,24 @@ async function runOne(id, source) {
             results.playable = "expiring";
           } else {
             throw probeErr;
+          }
+        }
+
+        // Bonus: probe every subtitle URL. Fail if we can't fetch even
+        // the first VTT/SRT — a common regression when someone typos a
+        // path or the repo is renamed.
+        const allSubs = links.flatMap((l) => l.subtitles || []);
+        if (allSubs.length > 0) {
+          const s0 = allSubs[0];
+          const sp = sandboxHttpGet(s0.url, { referer: s0.referer || undefined });
+          results.subtitleProbe = {
+            url: s0.url.slice(0, 120),
+            status: sp.status,
+            type: sp.headers["content-type"] || null,
+            firstLine: sp.body.split(/\r?\n/, 1)[0]?.slice(0, 30),
+          };
+          if (sp.status >= 400) {
+            throw new Error(`subtitle HEAD failed: HTTP ${sp.status} for ${s0.url}`);
           }
         }
       }

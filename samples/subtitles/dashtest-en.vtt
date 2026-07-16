@@ -1,0 +1,22 @@
+WEBVTT
+
+NOTE
+Demo captions for the StreamNative "dashtest" extension.
+Displayed on top of Big Buck Bunny (DASH-IF test manifest).
+
+1
+00:00:00.000 --> 00:00:04.000 line:90%
+This is a WebVTT track served by the sample-repo.
+
+2
+00:00:04.100 --> 00:00:08.000 line:90%
+Rendered on top of an MPEG-DASH stream.
+
+3
+00:00:08.100 --> 00:00:12.000 line:90%
+Proxied through StreamNative's local HTTP server.
+
+4
+00:00:12.100 --> 00:00:20.000 line:90%
+This proves the DASH + subtitle-track pipeline
+end-to-end.
