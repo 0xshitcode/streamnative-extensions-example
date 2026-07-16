@@ -215,6 +215,14 @@ async function runOne(id, source) {
           (n, l) => n + (Array.isArray(l.subtitles) ? l.subtitles.length : 0),
           0
         );
+        // Any DRM-protected links? Note scheme + key-count for the summary.
+        const drms = links.filter((l) => l.drm && l.drm.scheme);
+        if (drms.length > 0) {
+          results.drm = {
+            scheme: drms[0].drm.scheme,
+            keyCount: Object.keys(drms[0].drm.keys || {}).length,
+          };
+        }
 
         // Probe the first *playable* link (HLS, DASH, or direct mp4).
         // Ignore iframe-only sources like Odysee — the app can't decode
@@ -225,9 +233,13 @@ async function runOne(id, source) {
         const first = candidates[0] || links[0];
         results.probedUrl = first.url.slice(0, 120);
         try {
+          // Fetch more bytes on DRM manifests so <ContentProtection>
+          // markers land in the window (the header may push past 1 KiB
+          // on multi-DRM manifests).
+          const rangeEnd = first.drm ? "32767" : "1023";
           const probe = sandboxHttpGet(first.url, {
             referer: first.referer || undefined,
-            headers: { Range: "bytes=0-1023" },
+            headers: { Range: `bytes=0-${rangeEnd}` },
           });
           const ct = (probe.headers["content-type"] || "").toLowerCase();
           const ok = probe.status >= 200 && probe.status < 400;
@@ -243,6 +255,15 @@ async function runOne(id, source) {
             results.probeStatus = probe.status;
             results.probeType = probe.headers["content-type"] || null;
             results.probeBytes = probe.body.length;
+            // For DRM DASH manifests, sanity-check the MPD contains a
+            // <ContentProtection> element referencing the DRM scheme.
+            // ClearKey uses the W3C EME registered UUID
+            // e2719d58-a985-b3c9-781a-b030af78d30e (or MP4 protection
+            // scheme "cenc"/"cbcs"). Failing this is a real bug.
+            if (results.drm && !/ContentProtection/i.test(probe.body)) {
+              results.drmWarning =
+                "manifest has no <ContentProtection> element — DRM keys will be unused";
+            }
           } else if (ok && !isMedia) {
             results.probeStatus = probe.status;
             results.probeType = probe.headers["content-type"] || null;
@@ -334,7 +355,9 @@ async function main() {
   for (const r of hardPassed) {
     let msg = `  ✓ ${r.id}: ${r.probeStatus} ${r.probeType} (${r.probeBytes}B)`;
     if (r.subs) msg += ` · subs:${r.subs}`;
+    if (r.drm) msg += ` · drm:${r.drm.scheme}(${r.drm.keyCount} keys)`;
     if (r.subtitleWarning) msg += ` · sub-warn: ${r.subtitleWarning}`;
+    if (r.drmWarning) msg += ` · drm-warn: ${r.drmWarning}`;
     process.stderr.write(msg + "\n");
   }
   process.exit(failed.length > 0 ? 1 : 0);
