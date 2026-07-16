@@ -257,7 +257,16 @@ async function runOne(id, source) {
       }
     }
   } catch (err) {
-    results.error = String(err.message || err);
+    var msg = String(err.message || err);
+    // Any origin-side 403/503 (Cloudflare / anti-bot) is not our bug —
+    // downgrade to a soft "blocked" pass. This covers upstream API
+    // endpoints too (e.g. animeku.org for Kuronime).
+    if (/HTTP (401|403|503)/.test(msg) || /cloudflare|just a moment/i.test(msg)) {
+      results.blocked = true;
+      results.blockReason = msg;
+    } else {
+      results.error = msg;
+    }
   }
   return results;
 }
