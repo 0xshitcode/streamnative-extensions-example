@@ -2,7 +2,7 @@
   "name": "StreamNative Extensions — Example",
   "description": "Reference sample repository. Three live extensions (Nimegami, Donghub, Animexin) ported from HatsuneMikuUwU/cloudstream-extensions-uwu.",
   "version": 1,
-  "generatedAt": "2026-07-16T09:24:45.467Z",
+  "generatedAt": "2026-07-16T09:40:28.404Z",
   "extensions": [
     {
       "id": "animexin",
