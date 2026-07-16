@@ -1,8 +1,8 @@
 {
   "name": "StreamNative Extensions — Example",
-  "description": "Reference sample repository. Three live extensions (Nimegami, Donghub, Animexin) ported from HatsuneMikuUwU/cloudstream-extensions-uwu.",
+  "description": "Reference sample repository. Four live extensions (Nimegami, Donghub, Animexin, Kuronime) ported from HatsuneMikuUwU/cloudstream-extensions-uwu — includes an AES-CBC crypto challenge (Kuronime) and demonstrates HLS / direct-MP4 / iframe playback formats.",
   "version": 1,
-  "generatedAt": "2026-07-16T11:41:32.326Z",
+  "generatedAt": "2026-07-16T11:50:48.125Z",
   "extensions": [
     {
       "id": "animexin",
