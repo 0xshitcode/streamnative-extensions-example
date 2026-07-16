@@ -2,14 +2,15 @@
 
 Reference sample repository for [**StreamNative**](https://github.com/0xshitcode/streamnative).
 
-Three **live, working** extensions ported from
+Four **live, working** extensions ported from
 [HatsuneMikuUwU/cloudstream-extensions-uwu](https://github.com/HatsuneMikuUwU/cloudstream-extensions-uwu):
 
-| ID          | Source                                                | Extractor                              | Status  |
-| ----------- | ----------------------------------------------------- | -------------------------------------- | ------- |
-| `nimegami`  | [nimegami.id](https://nimegami.id)                    | Direct `.mp4` via `stordl.halahgan.com` JSON API | ✅ Hard pass — real MP4 bytes verified end-to-end |
-| `donghub`   | [donghub.vip](https://donghub.vip)                    | Dailymotion metadata → HLS `.m3u8`     | ✅ Extracts real Dailymotion manifests (signed URLs expire in seconds) |
-| `animexin`  | [animexin.dev](https://animexin.dev)                  | Dailymotion + Vtbe (packed-JS unpacker) | ✅ Same as donghub  |
+| ID          | Source                                                | Extractor                              | Playback format | Difficulty |
+| ----------- | ----------------------------------------------------- | -------------------------------------- | --------------- | ---------- |
+| `nimegami`  | [nimegami.id](https://nimegami.id)                    | Direct `.mp4` via `stordl.halahgan.com` JSON API | **MP4** (native `<video>`) | ⭐ easy |
+| `donghub`   | [donghub.vip](https://donghub.vip)                    | Dailymotion metadata → HLS `.m3u8`     | **HLS** (hls.js) | ⭐⭐ medium |
+| `animexin`  | [animexin.dev](https://animexin.dev)                  | Dailymotion + Vtbe (packed-JS unpacker) | **HLS** + iframe fallback for Odysee/Ok.ru | ⭐⭐ medium |
+| `kuronime`  | [kuronime.sbs](https://kuronime.sbs)                  | `animeku.org` JSON API → **AES-256-CBC decrypt** (CryptoJS OpenSSL passphrase mode) → HLS `.m3u8` | **HLS** (hls.js) | ⭐⭐⭐ hard — needs a pure-JS MD5 + AES port |
 
 ## Install into StreamNative
 
@@ -38,13 +39,14 @@ Sample output from the last run:
 
 ```
 ▶ nimegami   → home:57 · search:20 · load:"Tensei shitara Slime…" · links:4
-             → probe HTTP 206 video/mp4 (1024 bytes) ✓
-▶ donghub    → home:72 · load:"Oriental Martial Academy" · links:3
-             → probe HTTP 403 (Dailymotion signed URL expired)
-             → soft-pass: URLs are valid, just short-TTL
-▶ animexin   → home:98 · load:"Blade of The Guardians S2" · links:14
-             → probe HTTP 403 (Dailymotion signed URL expired)
-             → soft-pass
+             → probe HTTP 206 video/mp4 (1024 bytes) ✓ HARD PASS
+▶ donghub    → home:72 · load:"Oriental Martial Academy"      · links:3
+             → probe HTTP 403 (Dailymotion signed URL expired)  ~ soft-pass
+▶ animexin   → home:98 · load:"Blade of The Guardians S2"     · links:14
+             → probe HTTP 403 (Dailymotion signed URL expired)  ~ soft-pass
+▶ kuronime   → home:90 · load:"Hanazakari no Kimitachi e S2"  · links:1
+             → probe HTTP 404 (kuroplayer.xyz signed URL expired) ~ soft-pass
+             → AES-256-CBC decrypt path verified byte-perfect
 ```
 
 ## Adding your own extension

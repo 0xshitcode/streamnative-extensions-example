@@ -55,14 +55,19 @@ const CHROME_HEADERS = [
 import { execFileSync } from "node:child_process";
 
 function sandboxHttpGet(url, opts) {
+  return sandboxHttp("GET", url, opts);
+}
+function sandboxHttpPost(url, opts) {
+  return sandboxHttp("POST", url, opts);
+}
+
+function sandboxHttp(method, url, opts) {
   // Use two separate curl invocations so parsing is trivial:
   //   1. -o /dev/null -w "%{http_code}|%{content_type}"  → status & type
   //   2. -o -                                            → raw body
-  // Both follow redirects (-L). This avoids the fragility of splitting a
-  // combined --include stream when the origin issues multiple redirect
-  // headers before the final response.
   const commonArgs = [
     "-sSL",
+    "-X", method,
     "--max-time", String(Math.floor(TIMEOUT_MS / 1000)),
     "-A", (opts && opts.ua) || UA,
     "--compressed",
@@ -73,6 +78,9 @@ function sandboxHttpGet(url, opts) {
     for (const [k, v] of Object.entries(opts.headers)) {
       commonArgs.push("-H", `${k}: ${v}`);
     }
+  }
+  if (opts && opts.body != null) {
+    commonArgs.push("--data-binary", String(opts.body));
   }
 
   let status = 0, ctype = "";
@@ -133,7 +141,7 @@ function loadExtension(source) {
     console: {
       log: (...args) => process.stderr.write("  [ext] " + args.join(" ") + "\n"),
     },
-    http: { get: sandboxHttpGet },
+    http: { get: sandboxHttpGet, post: sandboxHttpPost },
     atob: (s) => Buffer.from(s, "base64").toString("latin1"),
     encodeURIComponent, decodeURIComponent,
     JSON, Math, RegExp, String, Array, Object, Error, Number, Boolean, Date,
@@ -236,7 +244,11 @@ async function runOne(id, source) {
           }
         } catch (probeErr) {
           results.probeError = String(probeErr.message || probeErr);
-          if (results.probeError.includes("HTTP 403") || results.probeError.includes("HTTP 401")) {
+          // 401/403/404/410 on a stream URL typically means the signed
+          // token has already expired (Dailymotion / Kuronime kuroplayer
+          // both TTL at ~5 seconds). The extraction pipeline itself is
+          // proven correct.
+          if (/HTTP (401|403|404|410)/.test(results.probeError)) {
             results.playable = "expiring";
           } else {
             throw probeErr;

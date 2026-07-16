@@ -2,7 +2,7 @@
   "name": "StreamNative Extensions — Example",
   "description": "Reference sample repository. Three live extensions (Nimegami, Donghub, Animexin) ported from HatsuneMikuUwU/cloudstream-extensions-uwu.",
   "version": 1,
-  "generatedAt": "2026-07-16T09:40:28.404Z",
+  "generatedAt": "2026-07-16T11:41:32.326Z",
   "extensions": [
     {
       "id": "animexin",
@@ -34,6 +34,22 @@
       "iconUrl": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://donghub.vip&size=128",
       "status": 1,
       "url": "extensions/donghub.js"
+    },
+    {
+      "id": "kuronime",
+      "name": "Kuronime",
+      "description": "Anime subtitle Indonesia. Ported from cloudstream-extensions-uwu — includes AES-CBC key-derivation for the encrypted API response.",
+      "author": "hexated (original), 0xshitcode (port)",
+      "version": 1,
+      "language": "id",
+      "tvTypes": [
+        "Anime",
+        "AnimeMovie",
+        "Ova"
+      ],
+      "iconUrl": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://kuronime.sbs&size=128",
+      "status": 1,
+      "url": "extensions/kuronime.js"
     },
     {
       "id": "nimegami",

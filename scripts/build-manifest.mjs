@@ -21,7 +21,7 @@ const MANIFEST_PATH = join(REPO_ROOT, "repo.json");
 const REPO_INFO = {
   name: "StreamNative Extensions — Example",
   description:
-    "Reference sample repository. Three live extensions (Nimegami, Donghub, Animexin) ported from HatsuneMikuUwU/cloudstream-extensions-uwu.",
+    "Reference sample repository. Four live extensions (Nimegami, Donghub, Animexin, Kuronime) ported from HatsuneMikuUwU/cloudstream-extensions-uwu — includes an AES-CBC crypto challenge (Kuronime) and demonstrates HLS / direct-MP4 / iframe playback formats.",
   version: 1,
 };
 
