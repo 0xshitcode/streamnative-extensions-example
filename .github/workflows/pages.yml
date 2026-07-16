@@ -1,0 +1,95 @@
+name: Publish repository
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Regenerate repo.json + deploy to Pages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Regenerate repo.json
+        run: node scripts/build-manifest.mjs
+
+      - name: Commit repo.json (if changed)
+        run: |
+          if [[ -n "$(git status --porcelain repo.json)" ]]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add repo.json
+            git commit -m "chore: regenerate repo.json [skip ci]"
+            git push
+          else
+            echo "repo.json already up to date."
+          fi
+
+      - name: Prepare Pages content
+        run: |
+          mkdir -p _site
+          cp -r extensions _site/
+          cp repo.json _site/ || true
+          cp -r docs _site/docs 2>/dev/null || true
+          cp README.md _site/README.md 2>/dev/null || true
+          # Landing page redirects to the README on GitHub for convenience.
+          cat > _site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en"><head>
+          <meta charset="utf-8"/>
+          <title>StreamNative Extensions — Example</title>
+          <style>
+            body { font: 15px/1.55 system-ui,sans-serif; max-width: 720px; margin: 3rem auto; padding: 0 1rem; color: #eee; background: #141414; }
+            a { color: #E50914; }
+            code { background: #222; padding: 1px 6px; border-radius: 4px; }
+            pre { background: #1c1c1c; padding: 1rem; border-radius: 6px; overflow-x: auto; }
+          </style>
+          </head><body>
+          <h1>StreamNative Extensions — Example</h1>
+          <p>This is a sample <a href="https://github.com/0xshitcode/streamnative">StreamNative</a> extension repository.</p>
+          <h2>Add this repo in StreamNative</h2>
+          <p>Settings → Providers → Repositories → paste:</p>
+          <pre><code>https://0xshitcode.github.io/streamnative-extensions-example/repo.json</code></pre>
+          <h2>Contents</h2>
+          <ul>
+            <li><a href="./repo.json">repo.json</a> — the manifest</li>
+            <li><a href="./extensions/">extensions/</a> — source .js files</li>
+            <li><a href="https://github.com/0xshitcode/streamnative-extensions-example">source on GitHub</a></li>
+          </ul>
+          </body></html>
+          HTML
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

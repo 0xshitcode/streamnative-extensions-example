@@ -1,0 +1,38 @@
+{
+  "name": "StreamNative Extensions — Example",
+  "description": "Reference sample repository. Two extensions demonstrating the full StreamNative extension API.",
+  "version": 1,
+  "generatedAt": "2026-07-16T08:42:54.680Z",
+  "extensions": [
+    {
+      "id": "demo_static",
+      "name": "Demo (Static)",
+      "description": "Static in-memory catalog. Streams Mux's public HLS test asset. No network access — great for a first install to verify everything works.",
+      "author": "StreamNative",
+      "version": 1,
+      "language": "en",
+      "tvTypes": [
+        "Movie",
+        "TvSeries"
+      ],
+      "iconUrl": null,
+      "status": 1,
+      "url": "extensions/demo_static.js"
+    },
+    {
+      "id": "openlibrary",
+      "name": "Open Library",
+      "description": "Live search against the Open Library API. Demonstrates the http.get() binding, pagination, and JSON→SearchResult mapping.",
+      "author": "StreamNative",
+      "version": 1,
+      "language": "en",
+      "tvTypes": [
+        "Documentary",
+        "Other"
+      ],
+      "iconUrl": "https://openlibrary.org/static/images/openlibrary-logo-tighter.svg",
+      "status": 1,
+      "url": "extensions/openlibrary.js"
+    }
+  ]
+}
