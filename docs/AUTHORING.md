@@ -1,191 +1,214 @@
 # Authoring a StreamNative Extension
 
-A step-by-step walkthrough using this repository as a template. Full
-API reference lives in the main app repo:
+Step-by-step guide using this repository as a template. Full API
+reference lives at
 <https://github.com/0xshitcode/streamnative/blob/main/docs/EXTENSION-API.md>.
 
-## 1. Fork / clone this repo
+## 1. Pick a starter matching your target
+
+| Kind of target site                               | Copy this file    |
+| ------------------------------------------------- | ----------------- |
+| Direct `.mp4` / API returns a stream URL          | `nimegami.js`     |
+| WordPress HTML + Dailymotion embeds               | `donghub.js`      |
+| WordPress HTML + packed-JS extractor (Vtbe etc.)  | `animexin.js`     |
 
 ```bash
-gh repo fork 0xshitcode/streamnative-extensions-example --clone
+cp extensions/nimegami.js extensions/my_provider.js
 ```
 
-Or use it as a GitHub template.
+The file name (without `.js`) becomes the extension ID inside `repo.json`.
 
-## 2. Create your extension file
+## 2. Update the `metadata` block
 
-Copy an existing one that matches your use case:
-
-- `demo_static.js` — no network, in-memory catalog. Perfect starting
-  point when you're just learning the API.
-- `openlibrary.js` — real HTTP scraper. Good template for actual media
-  sites.
-
-```bash
-cp extensions/demo_static.js extensions/my_provider.js
-```
-
-The file name (without `.js`) becomes the extension's `id` inside the
-manifest.
-
-## 3. Edit the `metadata` block
-
-Only `name` is truly required. Everything else has defaults:
+Only `name` is required; the rest have sensible defaults.
 
 ```js
 const metadata = {
   name: "My Provider",
   description: "Streams from example.com",
-  language: "id",              // ISO 639-1
+  language: "id",
   authors: ["your-handle"],
-  status: 1,                    // 0=Down, 1=OK, 2=Slow, 3=Beta
+  status: 1,                        // 0=Down, 1=OK, 2=Slow, 3=Beta
   tvTypes: ["Anime", "AnimeMovie"],
   iconUrl: "https://example.com/favicon.ico",
-  version: 1                    // bump on release
+  version: 1                        // bump on release
 };
 ```
 
-## 4. Implement `search(query)`
+## 3. Implement `search(query)` (the only mandatory hook)
 
-The only mandatory hook. On every keystroke in the app's Search page,
-`search(q)` is called with `q` = the user's current query.
+Use `http.get()` — synchronous, blocks the sandbox thread:
 
 ```js
 function search(query) {
   const r = http.get("https://example.com/search?q=" + encodeURIComponent(query));
   if (r.status !== 200) throw new Error("upstream HTTP " + r.status);
-
-  // Assume the site returns JSON. If it's HTML, use string / regex tools;
-  // there is no jsdom / cheerio inside the sandbox.
-  const data = JSON.parse(r.body);
-  return data.results.map(function (item) {
-    return {
-      title: item.title,
-      image: item.poster,
-      url: "myprovider://" + item.slug,   // opaque, comes back to load()
-      year: item.year,
-      tvType: item.isSeries ? "TvSeries" : "Movie"
-    };
-  });
+  return parseResults(r.body);  // → SearchResult[]
 }
 ```
 
-## 5. (Optional) `home()`
+## 4. Implement `home()` (optional but recommended)
 
-Curated rails for the app's home page. If you skip this, the app calls
-`search("")` and shows one rail per extension.
+Cloudstream-style curated horizontal rails:
 
 ```js
 function home() {
   return [
-    { name: "Trending",       items: fetchList("/trending") },
-    { name: "Newly Added",    items: fetchList("/latest") },
-    { name: "Top Rated",      items: fetchList("/top") }
+    { name: "Trending", items: fetchList("/trending") },
+    { name: "Latest",   items: fetchList("/latest") }
   ];
 }
 ```
 
-## 6. (Optional) `load(url)`
+If omitted, StreamNative falls back to `search("")`.
 
-Called when a poster is clicked. Fetch the full detail page and return
-richer info + an episode list for series.
+## 5. Implement `load(url)` (optional)
+
+Called when a poster is clicked. Return richer info + episode list for
+series:
 
 ```js
 function load(url) {
-  const slug = url.replace("myprovider://", "");
-  const r = http.get("https://example.com/detail/" + slug);
-  const html = r.body;
-  // …parse HTML into structured info…
+  const r = http.get(url);
+  // …parse HTML/JSON…
   return {
-    title: extractTitle(html),
-    url: url,
-    tvType: "TvSeries",
-    plot: extractPlot(html),
-    year: extractYear(html),
-    episodes: extractEpisodes(html)  // [{ name, url, season, episode }]
+    title, url, tvType: "TvSeries",
+    plot, year, image, backdrop,
+    tags: ["Sci-Fi"], rating: 8.4,
+    episodes: [
+      { name: "Pilot", url: "…/ep1", season: 1, episode: 1 }
+    ]
   };
 }
 ```
 
-## 7. (Optional) `loadLinks(url)`
+## 6. Implement `loadLinks(url)` (optional)
 
-Called when Play is pressed on an item without a direct `streamUrl`.
+Called when Play is pressed. Return one or more playable sources:
 
 ```js
 function loadLinks(url) {
   const r = http.get(episodeApiUrl(url));
-  return JSON.parse(r.body).sources.map(function (s) {
-    return {
-      name: s.name,
-      url: s.file,
-      isM3u8: s.file.endsWith(".m3u8"),
-      quality: s.label,
-      referer: "https://example.com/"   // will be injected on every proxy hop
-    };
-  });
+  return JSON.parse(r.body).sources.map((s) => ({
+    name: s.label,
+    url:  s.file,
+    isM3u8: s.file.endsWith(".m3u8"),
+    quality: s.quality,
+    referer: "https://example.com/"   // proxy re-injects this on every hop
+  }));
 }
 ```
 
-## 8. Test locally
+StreamNative shows a source picker if you return multiple links.
 
-You have two options:
+## 7. Verify locally
 
-**A. Install into your local StreamNative** — quicker feedback loop.
-1. Point Settings → Providers → Extensions folder at
-   `<your-clone>/extensions/`.
+The repository ships a live-test harness that runs your extension
+against real websites, no browser needed:
+
+```bash
+node scripts/live-test.mjs my_provider
+```
+
+Expected output includes:
+- `home:N` — total items across all rails
+- `search:N` — query result count
+- `load:{ title, tvType, episodes }` — first item's detail parse
+- `links:N` — sources found for the first episode
+- `probeStatus` + `probeType` — verifies the stream URL responds with a
+  media content-type
+
+`probeStatus: 206 video/mp4` means the extension is completely working.
+`probeStatus: 403` on a Dailymotion-style provider is a **soft-pass**:
+the URL is valid but the anti-hotlinking token expired between extract
+and probe — real playback from the app will succeed because it re-runs
+`loadLinks` right before playing.
+
+## 8. Test inside StreamNative
+
+**Fast dev loop** (edit-in-place):
+
+1. Settings → Providers → Extensions folder → **Browse** → pick this repo's `extensions/` dir.
 2. Click **Rescan**.
-3. `console.log(...)` output appears in the terminal running
-   `npm run tauri dev`.
+3. Open Home → your extension's rails should appear.
+4. `console.log(...)` from your extension goes to the app's stderr
+   (`npm run tauri dev` in the StreamNative repo).
 
-**B. Preview via the local manifest** — verifies the full install flow.
-1. Serve the repo locally: `python3 -m http.server 8000`
-2. In the app, Settings → Providers → Repositories → paste
-   `http://localhost:8000/repo.json` → Preview → Add → Install.
+**Full install-from-repo loop**:
 
-## 9. Push
+1. Serve this repo locally: `python3 -m http.server 8000`
+2. Settings → Providers → Repositories → paste `http://localhost:8000/repo.json`
+3. Preview → Add → Install → open Home.
 
-Commit your `.js` and push to `main`. GitHub Actions will:
+## 9. Ship it
 
-1. Run `scripts/build-manifest.mjs` to regenerate `repo.json`
-2. Commit the updated manifest back to `main` (with `[skip ci]`)
-3. Deploy the whole repo to GitHub Pages
+Commit your `.js` and push to `main`. The `pages.yml` workflow will:
 
-Users hit **Rescan** on their repo entry (or re-install the extension)
-to pick up your new version.
+1. Run `live-test.mjs` — **fails the build if your extension is broken**
+2. Regenerate `repo.json` from every `extensions/*.js`
+3. Deploy the whole repo (extensions + manifest + docs) to GitHub Pages
 
-## Debugging tips
+Users hit **Rescan** on the repo (or re-install the extension) to pick
+up your new version.
 
-- **`console.log()` is your friend.** It goes to the app's stderr;
-  `npm run tauri dev` shows it. Objects are auto-JSON-stringified.
-- **The sandbox is fresh per call.** Do not rely on module-level
-  variables surviving between hooks. If you need caching, put it
-  inside your extension and re-populate it at the top of every hook.
-- **`http.get` is synchronous.** For pagination, loop with a counter.
-  Don't try `async/await` — QuickJS supports it, but our host does
-  not currently pump the microtask queue between the sync return of
-  the hook and reading its result.
-- **HTML parsing.** No `document`, no `DOMParser`. Use `String.prototype.match`,
-  `RegExp`, or vendor a small util in your extension. Keep it fast —
-  the 64 MiB memory cap fits typical scrapes comfortably but not
-  gigabytes.
-- **CORS is not your problem.** The Rust proxy strips CORS entirely
-  when it re-emits stream URLs; your extension only needs to hand back
-  the correct upstream URL + Referer/UA.
+## Common patterns
 
-## Anti-hotlinking cheat sheet
+### base64-encoded payloads
 
-Most media CDNs deny requests without a matching `Referer`. Set it on
-each `MediaLink`:
+Many WordPress-based sites base64-encode the embed URL inside
+`<option value="…">` tags:
 
 ```js
-{
-  name: "CDN-1",
-  url: "https://cdn.example.com/hls/master.m3u8",
-  isM3u8: true,
-  referer: "https://the-player-page.example.com/",
-  headers: { "Origin": "https://the-player-page.example.com" }
+var opts = findAll(/<option\s+value="([^"]+)"[^>]*>([\s\S]*?)<\/option>/, html);
+for (var i = 0; i < opts.length; i++) {
+  var decoded = atob(opts[i][1]);
+  var iframeUrl = /<iframe[^>]+src="([^"]+)"/.exec(decoded)[1];
+  // …hand iframeUrl off to a per-host extractor…
 }
 ```
 
-The proxy will re-inject those headers on **every** subsequent segment
-fetch (not just the master), so anti-hotlinking works out of the box.
+### Dailymotion extractor
+
+Copy this whole block from `donghub.js` or `animexin.js`. It handles
+both `www.dailymotion.com/embed/video/XXX` and
+`geo.dailymotion.com/player.html?video=XXX` and hits
+`/player/metadata/video/XXX` to pull the `.m3u8` URL.
+
+### Packed-JS ("dean-edwards") unpacker
+
+See the bottom of `animexin.js`. Handles the classic
+`eval(function(p,a,c,k,e,d){…}(...))` bootstrap that many Filemoon-family
+sites use to hide `sources:[{file:"…"}]`.
+
+### Anti-hotlinking
+
+Most CDNs check `Referer`. Set it on every `MediaLink`:
+
+```js
+{ name, url, isM3u8: true, referer: "https://the-embed-page.com/" }
+```
+
+StreamNative's Rust proxy re-injects that Referer on **every** m3u8
+variant and .ts segment fetch, not just the master — so anti-hotlinking
+works transparently.
+
+### Sync `http.get` gotcha
+
+There's no `async/await` and no `Promise`. The sandbox thread blocks
+inside `http.get` until the response comes back. Use tight timeouts,
+handle non-200s explicitly, and never call `http.get` in a tight loop
+you can't bound.
+
+## Debugging
+
+- **`console.log(anything)`** — output goes to app stderr, prefixed with
+  `[ext]`. Objects are JSON-stringified.
+- **`throw new Error("what happened")`** — surfaced as a toast in the UI.
+  Never return an empty array to mean "error" — the app can't tell that
+  apart from "no results".
+- **Sandbox restarts every call.** Module-scope caches persist ONLY
+  within a single hook invocation. Anything you need across calls must
+  be re-fetched.
+- **No `document`, no `DOMParser`, no `cheerio`.** Use `String.match`,
+  `RegExp`, and small hand-rolled helpers (see the `findAll`,
+  `firstMatch`, `decodeHtmlEntities` helpers in every sample extension).

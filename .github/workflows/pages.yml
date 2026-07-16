@@ -28,6 +28,9 @@ jobs:
         with:
           node-version: 20
 
+      - name: Live-test all extensions against real provider sites
+        run: node scripts/live-test.mjs
+
       - name: Regenerate repo.json
         run: node scripts/build-manifest.mjs
 

@@ -20,7 +20,8 @@ const MANIFEST_PATH = join(REPO_ROOT, "repo.json");
 /** Top-level repo metadata. Edit here if you want a different display name. */
 const REPO_INFO = {
   name: "StreamNative Extensions — Example",
-  description: "Reference sample repository. Two extensions demonstrating the full StreamNative extension API.",
+  description:
+    "Reference sample repository. Three live extensions (Nimegami, Donghub, Animexin) ported from HatsuneMikuUwU/cloudstream-extensions-uwu.",
   version: 1,
 };
 

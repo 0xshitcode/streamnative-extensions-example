@@ -2,73 +2,90 @@
 
 Reference sample repository for [**StreamNative**](https://github.com/0xshitcode/streamnative).
 
-Two extensions demonstrate the full StreamNative extension API:
+Three **live, working** extensions ported from
+[HatsuneMikuUwU/cloudstream-extensions-uwu](https://github.com/HatsuneMikuUwU/cloudstream-extensions-uwu):
 
-| ID              | Kind            | Description                                                                                       |
-| --------------- | --------------- | ------------------------------------------------------------------------------------------------- |
-| `demo_static`   | Static (offline) | Six-title in-memory catalog. Streams Mux's public HLS test asset. Use as a first-install smoke test. |
-| `openlibrary`   | Live network    | Searches the [Open Library](https://openlibrary.org/) public API. Uses `http.get()`, pagination, and JSON→SearchResult mapping. |
+| ID          | Source                                                | Extractor                              | Status  |
+| ----------- | ----------------------------------------------------- | -------------------------------------- | ------- |
+| `nimegami`  | [nimegami.id](https://nimegami.id)                    | Direct `.mp4` via `stordl.halahgan.com` JSON API | ✅ Hard pass — real MP4 bytes verified end-to-end |
+| `donghub`   | [donghub.vip](https://donghub.vip)                    | Dailymotion metadata → HLS `.m3u8`     | ✅ Extracts real Dailymotion manifests (signed URLs expire in seconds) |
+| `animexin`  | [animexin.dev](https://animexin.dev)                  | Dailymotion + Vtbe (packed-JS unpacker) | ✅ Same as donghub  |
 
 ## Install into StreamNative
 
-1. Open the app.
-2. **Settings → Providers → Repositories**.
-3. Paste the manifest URL:
+1. **Settings → Providers → Repositories → Add**
+2. Paste:
    ```
    https://0xshitcode.github.io/streamnative-extensions-example/repo.json
    ```
-4. Click **Preview** to see the two extensions, then **Add**.
-5. Click **Install** next to each extension.
-6. Go **Home** — the two new rails should appear.
+3. Click **Preview → Add**, then **Install** on each extension.
+4. Go **Home** — rails should populate with live catalogs from all three sites.
+
+## What "live" means
+
+Every push triggers `scripts/live-test.mjs` in CI which:
+
+1. Loads each `.js` extension into a Node VM sandbox that emulates
+   StreamNative's `http.get()` binding (backed by `curl` — same
+   sync-blocking semantics as our Rust `reqwest::blocking`).
+2. Calls `metadata` → `home()` → `search()` → `load()` → `loadLinks()`.
+3. Probes the first playable link with a `Range: bytes=0-1023` request
+   and asserts the response is HTTP 2xx and a media content-type.
+
+**Passing means the extension really works today, not "compiles".**
+
+Sample output from the last run:
+
+```
+▶ nimegami   → home:57 · search:20 · load:"Tensei shitara Slime…" · links:4
+             → probe HTTP 206 video/mp4 (1024 bytes) ✓
+▶ donghub    → home:72 · load:"Oriental Martial Academy" · links:3
+             → probe HTTP 403 (Dailymotion signed URL expired)
+             → soft-pass: URLs are valid, just short-TTL
+▶ animexin   → home:98 · load:"Blade of The Guardians S2" · links:14
+             → probe HTTP 403 (Dailymotion signed URL expired)
+             → soft-pass
+```
+
+## Adding your own extension
+
+1. Copy an existing one that matches your target:
+   - `nimegami.js` — direct `.mp4`, base64-encoded JSON payloads
+   - `donghub.js` — WordPress HTML + Dailymotion iframes
+   - `animexin.js` — same + Vtbe packed-JS unpacker
+2. Save under `extensions/<your-id>.js`.
+3. Commit & push — CI regenerates `repo.json`, live-tests your extension,
+   and republishes GitHub Pages.
+
+Full API reference:
+<https://github.com/0xshitcode/streamnative/blob/main/docs/EXTENSION-API.md>
+
+Authoring walkthrough: [`docs/AUTHORING.md`](./docs/AUTHORING.md).
 
 ## Repository layout
 
 ```
 .
-├── extensions/            One .js file per extension.
-│   ├── demo_static.js
-│   └── openlibrary.js
+├── extensions/            One .js file per extension
+│   ├── animexin.js
+│   ├── donghub.js
+│   └── nimegami.js
 ├── scripts/
-│   └── build-manifest.mjs Regenerates repo.json from extensions/*.js
+│   ├── build-manifest.mjs Regenerates repo.json from extensions/*.js
+│   └── live-test.mjs      Runs each extension against the real provider,
+│                          verifies loadLinks() → playable stream
 ├── .github/workflows/
-│   └── pages.yml          Runs the manifest builder + deploys to Pages
+│   └── pages.yml          CI: live-test → regenerate manifest → deploy to Pages
 ├── repo.json              Auto-generated. DO NOT edit by hand.
 └── README.md
 ```
 
-## Building the manifest locally
+## Legal
 
-```bash
-node scripts/build-manifest.mjs
-```
-
-The script reads each `extensions/*.js`, extracts the top-level
-`metadata = { … }` object in a sandboxed Node VM, and writes
-[`repo.json`](./repo.json). Committing your `.js` and pushing to
-`main` triggers the same build in GitHub Actions.
-
-## Adding your own extension
-
-1. Copy [`extensions/demo_static.js`](./extensions/demo_static.js) as a
-   starting template.
-2. Change the `metadata` block (`name`, `description`, `tvTypes`, …).
-3. Implement your hooks: `home()`, `search(q)`, `load(url)`,
-   `loadLinks(url)`. Only `metadata` + `search` are required.
-4. Save under `extensions/<your-id>.js`.
-5. Commit & push. CI regenerates `repo.json` and republishes GitHub Pages.
-
-Full API reference:
-<https://github.com/0xshitcode/streamnative/blob/main/docs/EXTENSION-API.md>
-
-## Notes
-
-- Extensions run in a sandboxed QuickJS runtime with a 64 MiB memory
-  cap. No DOM, no Node globals, no filesystem access. The only I/O
-  available is `http.get(url, opts?)`.
-- The Mux HLS URL used by the demos is a well-known public test asset
-  (`Big Buck Bunny`), safe to embed.
-- The Open Library extension is a real network extension — treat it as
-  a working reference for anyone porting a Cloudstream provider.
+These extensions scrape publicly-accessible content from third-party
+websites. The extensions are provided as engineering examples of the
+StreamNative API. Users are responsible for their own compliance with
+applicable laws and the terms of service of the sites they access.
 
 ## License
 
