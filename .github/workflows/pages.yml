@@ -50,9 +50,10 @@ jobs:
         run: |
           mkdir -p _site
           cp -r extensions _site/
-          cp repo.json _site/ || true
-          cp -r docs _site/docs 2>/dev/null || true
-          cp README.md _site/README.md 2>/dev/null || true
+          cp -r samples    _site/samples 2>/dev/null || true
+          cp repo.json     _site/        || true
+          cp -r docs       _site/docs   2>/dev/null || true
+          cp README.md     _site/README.md 2>/dev/null || true
           # Landing page redirects to the README on GitHub for convenience.
           cat > _site/index.html <<'HTML'
           <!doctype html>

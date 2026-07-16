@@ -264,21 +264,24 @@ async function runOne(id, source) {
           }
         }
 
-        // Bonus: probe every subtitle URL. Fail if we can't fetch even
-        // the first VTT/SRT — a common regression when someone typos a
-        // path or the repo is renamed.
+        // Bonus: probe every subtitle URL. Report as a warning, not a
+        // hard failure — the first push of a new subtitle file often
+        // races GitHub Pages deployment, and a stale probe on the
+        // extension side is not a code bug.
         const allSubs = links.flatMap((l) => l.subtitles || []);
         if (allSubs.length > 0) {
           const s0 = allSubs[0];
           const sp = sandboxHttpGet(s0.url, { referer: s0.referer || undefined });
+          const looksLikeVtt = /^WEBVTT/i.test(sp.body.trimStart());
+          const looksLikeSrt = /-->/i.test(sp.body);
           results.subtitleProbe = {
             url: s0.url.slice(0, 120),
             status: sp.status,
             type: sp.headers["content-type"] || null,
-            firstLine: sp.body.split(/\r?\n/, 1)[0]?.slice(0, 30),
+            valid: looksLikeVtt || looksLikeSrt,
           };
-          if (sp.status >= 400) {
-            throw new Error(`subtitle HEAD failed: HTTP ${sp.status} for ${s0.url}`);
+          if (sp.status >= 400 || !(looksLikeVtt || looksLikeSrt)) {
+            results.subtitleWarning = `first subtitle unreachable / not VTT/SRT (HTTP ${sp.status}) — may recover after Pages redeploy`;
           }
         }
       }
@@ -328,7 +331,12 @@ async function main() {
   for (const r of failed)     process.stderr.write(`  ✗ ${r.id}: ${r.error}\n`);
   for (const r of blocked)    process.stderr.write(`  ⚠ ${r.id}: ${r.blockReason}\n`);
   for (const r of softPassed) process.stderr.write(`  ~ ${r.id}: probe expired (${r.probeError})\n`);
-  for (const r of hardPassed) process.stderr.write(`  ✓ ${r.id}: ${r.probeStatus} ${r.probeType} (${r.probeBytes}B)\n`);
+  for (const r of hardPassed) {
+    let msg = `  ✓ ${r.id}: ${r.probeStatus} ${r.probeType} (${r.probeBytes}B)`;
+    if (r.subs) msg += ` · subs:${r.subs}`;
+    if (r.subtitleWarning) msg += ` · sub-warn: ${r.subtitleWarning}`;
+    process.stderr.write(msg + "\n");
+  }
   process.exit(failed.length > 0 ? 1 : 0);
 }
 
